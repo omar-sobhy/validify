@@ -260,7 +260,7 @@ pub fn schema_validation(
 ///     b: Option<String>
 /// }
 /// ```
-#[proc_macro_derive(Payload)]
+#[proc_macro_derive(Payload, attributes(payload_derives))]
 #[proc_macro_error]
 pub fn derive_payload(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let input = syn::parse(input).unwrap();

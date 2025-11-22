@@ -4,7 +4,7 @@ use crate::{
 };
 use proc_macro_error::abort;
 use quote::{format_ident, quote};
-use syn::spanned::Spanned;
+use syn::{punctuated::Punctuated, spanned::Spanned};
 
 pub mod r#impl;
 
@@ -62,8 +62,10 @@ pub(super) fn generate_struct(input: &syn::DeriveInput) -> proc_macro2::TokenStr
         .map(map_from_fields)
         .collect::<Vec<proc_macro2::TokenStream>>();
 
+    let derives = generate_derives(input);
+
     let quoted = quote!(
-        #[derive(Debug, ::validify::Validate, serde::Deserialize)]
+        #derives
         #(#attributes)*
         #visibility struct #payload_ident #ty_generics #where_clause {
             #(#payload_fields)*
@@ -89,6 +91,34 @@ pub(super) fn generate_struct(input: &syn::DeriveInput) -> proc_macro2::TokenStr
     );
 
     quoted
+}
+
+fn generate_derives(input: &syn::DeriveInput) -> proc_macro2::TokenStream {
+    let payload_derives = input
+        .attrs
+        .iter()
+        .find(|a| a.meta.path().is_ident("payload_derives"));
+
+    let args = match payload_derives {
+        Some(attr) => {
+            let args =
+                attr.parse_args_with(Punctuated::<syn::Ident, syn::Token![,]>::parse_terminated);
+
+            match args {
+                Err(_) => {
+                    abort!(payload_derives, "Could not parse arguments")
+                }
+                Ok(punctuated) => Some(punctuated),
+            }
+        }
+        None => None,
+    };
+
+    let args = args.unwrap_or(Punctuated::default()).into_iter();
+
+    quote! (
+        #[derive(Debug, ::validify::Validate, serde::Deserialize, #(#args),*)]
+    )
 }
 
 fn map_payload_fields(
